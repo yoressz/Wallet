@@ -65,7 +65,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
     ? '#10B981'
     : isWarning
     ? '#F59E0B'
-    : '#38BDF8';
+    : '#FAFAFA';
 
   return (
     <Animated.View style={[styles.toastContainer, { transform: [{ translateY }] }]}>
@@ -91,12 +91,12 @@ const styles = StyleSheet.create({
   toastBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
+    backgroundColor: '#18181B',
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#27272A',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -105,8 +105,8 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   toastText: {
-    color: '#F8FAFC',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#FAFAFA',
     fontSize: 13,
-    fontWeight: '600',
   },
 });

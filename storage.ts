@@ -56,7 +56,12 @@ export interface LocalWalletData {
 }
 
 const USERNAME_KEY = '@wallet_username';
-const DATA_KEY = '@wallet_data';
+const ACCOUNTS_KEY = '@wallet_accounts';
+const TRANSACTIONS_KEY = '@wallet_transactions';
+const LOAN_ACCOUNTS_KEY = '@wallet_loan_accounts';
+const LOAN_TRANSACTIONS_KEY = '@wallet_loan_transactions';
+const DAILY_LIMIT_KEY = '@wallet_daily_limit';
+const LEGACY_DATA_KEY = '@wallet_data';
 
 export async function saveImageToPermanentStorage(sourceUri: string): Promise<string> {
   try {
@@ -105,32 +110,62 @@ export const localStorage = {
 
   async loadLocalData(): Promise<LocalWalletData> {
     try {
-      const raw = await AsyncStorage.getItem(DATA_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as LocalWalletData;
-        return {
-          accounts: parsed.accounts || [],
-          transactions: parsed.transactions || [],
-          loanAccounts: parsed.loanAccounts || [],
-          loanTransactions: parsed.loanTransactions || [],
-          dailyLimit: typeof parsed.dailyLimit === 'number' ? parsed.dailyLimit : 230,
-        };
+      const [rawAccs, rawTxs, rawLoans, rawLTxs, rawLimit, rawLegacy] = await AsyncStorage.multiGet([
+        ACCOUNTS_KEY,
+        TRANSACTIONS_KEY,
+        LOAN_ACCOUNTS_KEY,
+        LOAN_TRANSACTIONS_KEY,
+        DAILY_LIMIT_KEY,
+        LEGACY_DATA_KEY,
+      ]);
+
+      let accounts: Account[] = rawAccs[1] ? JSON.parse(rawAccs[1]) : [];
+      let transactions: Transaction[] = rawTxs[1] ? JSON.parse(rawTxs[1]) : [];
+      let loanAccounts: LoanAccount[] = rawLoans[1] ? JSON.parse(rawLoans[1]) : [];
+      let loanTransactions: LoanTransaction[] = rawLTxs[1] ? JSON.parse(rawLTxs[1]) : [];
+      let dailyLimit: number = rawLimit[1] ? parseFloat(rawLimit[1]) : 230;
+
+      if (accounts.length === 0 && rawLegacy[1]) {
+        try {
+          const parsed = JSON.parse(rawLegacy[1]) as LocalWalletData;
+          accounts = parsed.accounts || [];
+          transactions = parsed.transactions || [];
+          loanAccounts = parsed.loanAccounts || [];
+          loanTransactions = parsed.loanTransactions || [];
+          dailyLimit = typeof parsed.dailyLimit === 'number' ? parsed.dailyLimit : 230;
+        } catch {
+          // ignore
+        }
       }
+
+      return {
+        accounts,
+        transactions,
+        loanAccounts,
+        loanTransactions,
+        dailyLimit,
+      };
     } catch {
-      // ignore
+      return {
+        accounts: [],
+        transactions: [],
+        loanAccounts: [],
+        loanTransactions: [],
+        dailyLimit: 230,
+      };
     }
-    return {
-      accounts: [],
-      transactions: [],
-      loanAccounts: [],
-      loanTransactions: [],
-      dailyLimit: 230,
-    };
   },
 
   async saveLocalData(data: LocalWalletData): Promise<void> {
     try {
-      await AsyncStorage.setItem(DATA_KEY, JSON.stringify(data));
+      await AsyncStorage.multiSet([
+        [ACCOUNTS_KEY, JSON.stringify(data.accounts)],
+        [TRANSACTIONS_KEY, JSON.stringify(data.transactions)],
+        [LOAN_ACCOUNTS_KEY, JSON.stringify(data.loanAccounts)],
+        [LOAN_TRANSACTIONS_KEY, JSON.stringify(data.loanTransactions)],
+        [DAILY_LIMIT_KEY, data.dailyLimit.toString()],
+        [LEGACY_DATA_KEY, JSON.stringify(data)],
+      ]);
     } catch {
       // ignore
     }

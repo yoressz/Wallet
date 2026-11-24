@@ -6,10 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#09090B",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0b1120"
+      "backgroundColor": "#09090B"
     },
     "ios": {
       "supportsTablet": true,
@@ -17,8 +18,9 @@
     },
     "android": {
       "package": "com.monaec.app",
+      "backgroundColor": "#09090B",
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff",
+        "backgroundColor": "#09090B",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false
@@ -27,7 +29,9 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-image-picker"
+      "expo-image-picker",
+      "expo-font",
+      "expo-splash-screen"
     ]
   }
 }

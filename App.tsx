@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
   Modal,
   ScrollView,
   KeyboardAvoidingView,
@@ -14,7 +13,12 @@ import {
   Switch,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
+import { JetBrainsMono_500Medium, JetBrainsMono_600SemiBold, JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
 import { Feather } from '@expo/vector-icons';
 import {
   localStorage,
@@ -30,15 +34,159 @@ import {
 import { Toast, ToastState } from './components/Toast';
 import { ConfirmModal, ConfirmModalState } from './components/ConfirmModal';
 
+try {
+  SplashScreen?.preventAutoHideAsync?.().catch(() => {});
+} catch {}
+
 export default function App() {
   const [username, setUsername] = useState<string | null>(null);
   const [tempUsernameInput, setTempUsernameInput] = useState('');
   const [editUsernameInput, setEditUsernameInput] = useState('');
   const [initializing, setInitializing] = useState(true);
 
-  // Toast & Confirmation Modal States
+  let [fontsLoaded] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_600SemiBold,
+    JetBrainsMono_700Bold,
+  });
+
   const [toast, setToast] = useState<ToastState>({ visible: false, message: '' });
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({ visible: false, title: '', message: '' });
+  const [activeTab, setActiveTab] = useState<'home' | 'accounts' | 'insights'>('home');
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loanAccounts, setLoanAccounts] = useState<LoanAccount[]>([]);
+  const [loanTransactions, setLoanTransactions] = useState<LoanTransaction[]>([]);
+  const [dailyLimit, setDailyLimit] = useState<number>(230);
+  const [showNetWorth, setShowNetWorth] = useState(true);
+  const [selectedSwapCardId, setSelectedSwapCardId] = useState<string | null>(null);
+  const [accountFilter, setAccountFilter] = useState<string>('All');
+  const [lentLoanFilter, setLentLoanFilter] = useState<'all' | 'lent' | 'loan'>('all');
+  const [overviewType, setOverviewType] = useState<'all' | 'expense' | 'income'>('all');
+  const [overviewPeriod, setOverviewPeriod] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
+  const [dailyLimitModalVisible, setDailyLimitModalVisible] = useState(false);
+  const [tempDailyLimit, setTempDailyLimit] = useState('230');
+  const [calcModalVisible, setCalcModalVisible] = useState(false);
+  const [calcValue, setCalcValue] = useState('0');
+  const [calcOnApply, setCalcOnApply] = useState<((val: string) => void) | null>(null);
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [txModalVisible, setTxModalVisible] = useState(false);
+  const [submittingTx, setSubmittingTx] = useState(false);
+  const [txType, setTxType] = useState<'expense' | 'income'>('expense');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [amount, setAmount] = useState('0');
+  const [category, setCategory] = useState('Food & Dining');
+  const [note, setNote] = useState('');
+  const [loansFullViewVisible, setLoansFullViewVisible] = useState(false);
+  const [loanAccountModalVisible, setLoanAccountModalVisible] = useState(false);
+  const [editingLoanAccount, setEditingLoanAccount] = useState<LoanAccount | null>(null);
+  const [loanAccountType, setLoanAccountType] = useState<'lent' | 'loan'>('lent');
+  const [loanAccountName, setLoanAccountName] = useState('');
+  const [loanAccountAmount, setLoanAccountAmount] = useState('0');
+  const [loanAccountNote, setLoanAccountNote] = useState('');
+  const [loanIncludeInNetWorth, setLoanIncludeInNetWorth] = useState(true);
+  const [addCategoryModalVisible, setAddCategoryModalVisible] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [installmentModalVisible, setInstallmentModalVisible] = useState(false);
+  const [selectedLoanAccount, setSelectedLoanAccount] = useState<LoanAccount | null>(null);
+  const [installmentType, setInstallmentType] = useState<'installment' | 'principal'>('installment');
+  const [installmentAmount, setInstallmentAmount] = useState('0');
+  const [selectedPaymentWalletId, setSelectedPaymentWalletId] = useState<string>('none');
+  const [installmentNote, setInstallmentNote] = useState('');
+  const [assetAdjustModalVisible, setAssetAdjustModalVisible] = useState(false);
+  const [adjustTargetAccount, setAdjustTargetAccount] = useState<Account | null>(null);
+  const [adjustType, setAdjustType] = useState<'add' | 'subtract'>('add');
+  const [adjustAmount, setAdjustAmount] = useState('0');
+  const [accountModalVisible, setAccountModalVisible] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [newAccountName, setNewAccountName] = useState('');
+  const [newAccountType, setNewAccountType] = useState('Savings');
+  const [newAccountBalance, setNewAccountBalance] = useState('0');
+  const [includeInNetWorth, setIncludeInNetWorth] = useState(true);
+  const [accountImageUri, setAccountImageUri] = useState<string | undefined>(undefined);
+  const [accountCustomIcon, setAccountCustomIcon] = useState<string | undefined>(undefined);
+  const [accountCustomColor, setAccountCustomColor] = useState<string>('#10B981');
+  const [enableInterest, setEnableInterest] = useState(false);
+  const [baseInterestRate, setBaseInterestRate] = useState('3.5');
+  const [interestFrequency, setInterestFrequency] = useState<'daily' | 'monthly' | 'yearly'>('daily');
+  const [enableBoost, setEnableBoost] = useState(false);
+  const [boostedRate, setBoostedRate] = useState('6.0');
+  const [boostDays, setBoostDays] = useState('30');
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function runInit() {
+      try {
+        const savedUser = await localStorage.loadUsername();
+        if (savedUser && isMounted) {
+          setUsername(savedUser);
+          setEditUsernameInput(savedUser);
+        }
+
+        const data = await localStorage.loadLocalData();
+        if (isMounted) {
+          applyData(data);
+        }
+      } catch (e) {
+        // ignore
+      } finally {
+        if (isMounted) {
+          setInitializing(false);
+          try {
+            await SplashScreen?.hideAsync?.();
+          } catch {}
+        }
+      }
+    }
+    runInit();
+
+    const timer = setTimeout(() => {
+      if (isMounted) {
+        setInitializing(false);
+        try {
+          SplashScreen?.hideAsync?.().catch(() => {});
+        } catch {}
+      }
+    }, 1500);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, []);
+
+  const saveData = useCallback(
+    async (
+      updatedAccs = accounts,
+      updatedTxs = transactions,
+      updatedLoans = loanAccounts,
+      updatedLoanTxs = loanTransactions,
+      updatedLimit = dailyLimit
+    ) => {
+      setAccounts(updatedAccs);
+      setTransactions(updatedTxs);
+      setLoanAccounts(updatedLoans);
+      setLoanTransactions(updatedLoanTxs);
+      setDailyLimit(updatedLimit);
+
+      await localStorage.saveLocalData({
+        accounts: updatedAccs,
+        transactions: updatedTxs,
+        loanAccounts: updatedLoans,
+        loanTransactions: updatedLoanTxs,
+        dailyLimit: updatedLimit,
+      });
+    },
+    [accounts, transactions, loanAccounts, loanTransactions, dailyLimit]
+  );
 
   function showToast(message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') {
     setToast({ visible: true, message, type });
@@ -61,98 +209,19 @@ export default function App() {
     });
   }
 
-  // Active Screen Tab: 'home' | 'accounts' | 'insights'
-  const [activeTab, setActiveTab] = useState<'home' | 'accounts' | 'insights'>('home');
-
-  // Data states
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loanAccounts, setLoanAccounts] = useState<LoanAccount[]>([]);
-  const [loanTransactions, setLoanTransactions] = useState<LoanTransaction[]>([]);
-  const [dailyLimit, setDailyLimit] = useState<number>(230);
-
-  // UI state flags & filters
-  const [showNetWorth, setShowNetWorth] = useState(true);
-  const [selectedSwapCardId, setSelectedSwapCardId] = useState<string | null>(null);
-  const [accountFilter, setAccountFilter] = useState<string>('All');
-  const [lentLoanFilter, setLentLoanFilter] = useState<'all' | 'lent' | 'loan'>('all');
-  const [overviewType, setOverviewType] = useState<'all' | 'expense' | 'income'>('all');
-  const [overviewPeriod, setOverviewPeriod] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
-
-  // Daily budget limit state (editable)
-  const [dailyLimitModalVisible, setDailyLimitModalVisible] = useState(false);
-  const [tempDailyLimit, setTempDailyLimit] = useState('230');
-
-  // --- Calculator Keypad Modal State ---
-  const [calcModalVisible, setCalcModalVisible] = useState(false);
-  const [calcValue, setCalcValue] = useState('0');
-  const [calcOnApply, setCalcOnApply] = useState<((val: string) => void) | null>(null);
-
-  // --- Calendar Date/Time Picker Modal State ---
-  const [calendarVisible, setCalendarVisible] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [timePickerVisible, setTimePickerVisible] = useState(false);
-
-  // Transaction Modal
-  const [txModalVisible, setTxModalVisible] = useState(false);
-  const [submittingTx, setSubmittingTx] = useState(false);
-  const [txType, setTxType] = useState<'expense' | 'income'>('expense');
-  const [selectedAccountId, setSelectedAccountId] = useState('');
-  const [amount, setAmount] = useState('0');
-  const [category, setCategory] = useState('Food & Dining');
-  const [note, setNote] = useState('');
-
-  // Loan Full View & Loan Account Modal States
-  const [loansFullViewVisible, setLoansFullViewVisible] = useState(false);
-  const [loanAccountModalVisible, setLoanAccountModalVisible] = useState(false);
-  const [editingLoanAccount, setEditingLoanAccount] = useState<LoanAccount | null>(null);
-  const [loanAccountType, setLoanAccountType] = useState<'lent' | 'loan'>('lent');
-  const [loanAccountName, setLoanAccountName] = useState('');
-  const [loanAccountAmount, setLoanAccountAmount] = useState('0');
-  const [loanAccountNote, setLoanAccountNote] = useState('');
-  const [loanIncludeInNetWorth, setLoanIncludeInNetWorth] = useState(true);
-
-  // Custom Category Modal State
-  const [addCategoryModalVisible, setAddCategoryModalVisible] = useState(false);
-  const [newCategoryInput, setNewCategoryInput] = useState('');
-
-  // Installment / Payment Modal State
-  const [installmentModalVisible, setInstallmentModalVisible] = useState(false);
-  const [selectedLoanAccount, setSelectedLoanAccount] = useState<LoanAccount | null>(null);
-  const [installmentType, setInstallmentType] = useState<'installment' | 'principal'>('installment');
-  const [installmentAmount, setInstallmentAmount] = useState('0');
-  const [selectedPaymentWalletId, setSelectedPaymentWalletId] = useState<string>('none');
-  const [installmentNote, setInstallmentNote] = useState('');
-
-  // Asset Value Adjustment Modal
-  const [assetAdjustModalVisible, setAssetAdjustModalVisible] = useState(false);
-  const [adjustTargetAccount, setAdjustTargetAccount] = useState<Account | null>(null);
-  const [adjustType, setAdjustType] = useState<'add' | 'subtract'>('add');
-  const [adjustAmount, setAdjustAmount] = useState('0');
-
-  // Account Modal (Add / Edit)
-  const [accountModalVisible, setAccountModalVisible] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [newAccountName, setNewAccountName] = useState('');
-  const [newAccountType, setNewAccountType] = useState('Savings');
-  const [newAccountBalance, setNewAccountBalance] = useState('0');
-  const [includeInNetWorth, setIncludeInNetWorth] = useState(true);
-
-  // Custom Icon & Photo picker states
-  const [accountImageUri, setAccountImageUri] = useState<string | undefined>(undefined);
-  const [accountCustomIcon, setAccountCustomIcon] = useState<string | undefined>(undefined);
-  const [accountCustomColor, setAccountCustomColor] = useState<string>('#10B981');
-
-  // Interest Rate Features
-  const [enableInterest, setEnableInterest] = useState(false);
-  const [baseInterestRate, setBaseInterestRate] = useState('3.5');
-  const [interestFrequency, setInterestFrequency] = useState<'daily' | 'monthly' | 'yearly'>('daily');
-  const [enableBoost, setEnableBoost] = useState(false);
-  const [boostedRate, setBoostedRate] = useState('6.0');
-  const [boostDays, setBoostDays] = useState('30');
-
-  const [creatingAccount, setCreatingAccount] = useState(false);
-  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  if (initializing) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#09090B', justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar style="light" />
+        <View style={{ alignItems: 'center' }}>
+          <View style={{ width: 64, height: 64, borderRadius: 16, backgroundColor: '#18181B', justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#27272A' }}>
+            <Feather name="credit-card" size={28} color="#FAFAFA" />
+          </View>
+          <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 24, color: '#FAFAFA', includeFontPadding: false, paddingHorizontal: 16, letterSpacing: 0.5 }}>Wallet</Text>
+        </View>
+      </View>
+    );
+  }
 
   const categoryOptions = [
     'Food & Dining',
@@ -194,28 +263,7 @@ export default function App() {
 
   // --- Initial Load ---
 
-  useEffect(() => {
-    initApp();
-  }, []);
-
-  async function initApp() {
-    try {
-      const savedUser = await localStorage.loadUsername();
-      if (savedUser) {
-        setUsername(savedUser);
-        setEditUsernameInput(savedUser);
-      }
-
-      const data = await localStorage.loadLocalData();
-      applyData(data);
-    } catch {
-      // ignore
-    } finally {
-      setInitializing(false);
-    }
-  }
-
-  function applyData(data: LocalWalletData) {
+  async function applyData(data: LocalWalletData) {
     setAccounts(data.accounts || []);
     setTransactions(data.transactions || []);
     setLoanAccounts(data.loanAccounts || []);
@@ -228,30 +276,7 @@ export default function App() {
     }
   }
 
-  const saveData = useCallback(
-    async (
-      updatedAccs = accounts,
-      updatedTxs = transactions,
-      updatedLoans = loanAccounts,
-      updatedLoanTxs = loanTransactions,
-      updatedLimit = dailyLimit
-    ) => {
-      setAccounts(updatedAccs);
-      setTransactions(updatedTxs);
-      setLoanAccounts(updatedLoans);
-      setLoanTransactions(updatedLoanTxs);
-      setDailyLimit(updatedLimit);
 
-      await localStorage.saveLocalData({
-        accounts: updatedAccs,
-        transactions: updatedTxs,
-        loanAccounts: updatedLoans,
-        loanTransactions: updatedLoanTxs,
-        dailyLimit: updatedLimit,
-      });
-    },
-    [accounts, transactions, loanAccounts, loanTransactions, dailyLimit]
-  );
 
   // --- Username Onboarding & Editing Handlers ---
 
@@ -954,6 +979,7 @@ export default function App() {
   if (!username) {
     return (
       <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={styles.authScroll} keyboardShouldPersistTaps="handled">
             <Text style={styles.title}>Wallet</Text>
@@ -988,36 +1014,43 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="light" />
       {/* Toast Notification Banner */}
       <Toast toast={toast} onDismiss={() => setToast({ visible: false, message: '' })} />
 
       {/* Confirmation Modal */}
       <ConfirmModal modal={confirmModal} onClose={() => setConfirmModal({ visible: false, title: '', message: '' })} />
       {/* Top Bar Header */}
-      <View style={styles.topBarHeader}>
-        <TouchableOpacity style={styles.userProfilePill} onPress={() => setProfileModalVisible(true)}>
-          <Text style={styles.userProfileText}>@{username}</Text>
-          <Text style={styles.guestBadge}>Offline</Text>
-          <Text style={styles.userProfileArrow}>›</Text>
-        </TouchableOpacity>
-
-        {activeTab === 'accounts' && (
-          <TouchableOpacity style={styles.headerAddBtn} onPress={openCreateAccountModal}>
-            <Text style={styles.headerAddBtnText}>+ Add Account</Text>
+      <SafeAreaView edges={['top']} style={{ backgroundColor: '#09090B' }}>
+        <View style={styles.topBarHeader}>
+          <TouchableOpacity style={styles.userProfilePill} onPress={() => setProfileModalVisible(true)}>
+            <Text style={styles.userProfileText}>@{username}</Text>
+            <Text style={styles.userProfileArrow}>›</Text>
           </TouchableOpacity>
-        )}
-      </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {activeTab === 'accounts' && (
+              <TouchableOpacity style={styles.headerAddBtn} onPress={openCreateAccountModal}>
+                <Text style={styles.headerAddBtnText}>+ Add Account</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => setProfileModalVisible(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Feather name="settings" size={20} color="#A1A1AA" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
 
       {/* --- Main Content Area based on Active Tab --- */}
       <View style={{ flex: 1 }}>
         {activeTab === 'home' && (
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} nestedScrollEnabled>
-            {/* Total Net Worth Card */}
-            <View style={styles.netWorthCard}>
+            {/* Total Net Worth */}
+            <View style={{ paddingVertical: 20 }}>
               <View style={styles.netWorthHeaderRow}>
                 <Text style={styles.netWorthLabel}>Total Net Worth</Text>
                 <TouchableOpacity onPress={() => setShowNetWorth(!showNetWorth)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Text style={styles.eyeIcon}>{showNetWorth ? '👁' : '🙈'}</Text>
+                  <Feather name={showNetWorth ? 'eye' : 'eye-off'} size={18} color="#71717A" />
                 </TouchableOpacity>
               </View>
 
@@ -1100,16 +1133,16 @@ export default function App() {
             {/* Editable Daily Limit Card */}
             <View style={styles.dailyLimitCard}>
               <View style={styles.dailyLimitHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 20, marginRight: 8 }}>💵</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Feather name="sliders" size={18} color="#10B981" />
                   <View>
                     <Text style={styles.dailyLimitTitle}>Daily Limit</Text>
                     <Text style={styles.dailyLimitAmount}>₱{dailyLimit.toFixed(2)}</Text>
                   </View>
                 </View>
 
-                <TouchableOpacity style={styles.editLimitBtn} onPress={() => setDailyLimitModalVisible(true)}>
-                  <Text style={styles.editLimitBtnText}>✏️ Edit Limit</Text>
+                <TouchableOpacity style={styles.editLimitBtn} onPress={() => setDailyLimitModalVisible(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Feather name="sliders" size={16} color="#A1A1AA" />
                 </TouchableOpacity>
               </View>
 
@@ -1168,7 +1201,7 @@ export default function App() {
             )}
 
             {/* --- Dedicated Section for Money Lent & Loans --- */}
-            <View style={styles.lentLoanSection}>
+            <View style={{ marginTop: 18 }}>
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionHeading}>Money Lent & Loans</Text>
                 <TouchableOpacity onPress={() => setLoansFullViewVisible(true)}>
@@ -1181,52 +1214,24 @@ export default function App() {
               ) : (
                 loanAccounts.slice(0, 2).map((loanAcc) => {
                   const isLent = loanAcc.type === 'lent';
-                  const isExcluded = loanAcc.includeInNetWorth === false;
 
                   return (
-                    <View key={loanAcc.id} style={styles.loanCardContainer}>
-                      <View style={styles.transactionCard}>
-                        <View style={[styles.txLogoBox, { backgroundColor: isLent ? '#059669' : '#DC2626' }]}>
-                          <Text style={{ fontSize: 12 }}>{isLent ? '🤝' : '🏦'}</Text>
-                        </View>
-
-                        <View style={{ flex: 1, marginHorizontal: 12 }}>
-                          <Text style={styles.txCategory}>{loanAcc.name}</Text>
-                          <Text style={styles.txDate}>
-                            {isLent ? 'Money Lent Account' : 'Loan Account'} • {loanAcc.note || new Date(loanAcc.created_at).toLocaleDateString()}
-                          </Text>
-                        </View>
-
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={[styles.txAmount, isLent ? styles.incomeText : styles.expenseText]}>
-                            {isLent ? '+ ' : '- '}₱{Number(loanAcc.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                          </Text>
-
-                          <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
-                            <TouchableOpacity style={styles.loanEntryBtn} onPress={() => openInstallmentModal(loanAcc)}>
-                              <Text style={styles.loanEntryBtnText}>+ Entry 💳</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.loanEditBtn} onPress={() => openEditLoanAccountModal(loanAcc)}>
-                              <Text style={styles.loanEditBtnText}>✏️</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
+                    <TouchableOpacity key={loanAcc.id} style={styles.transactionCard} onPress={() => openInstallmentModal(loanAcc)}>
+                      <View style={[styles.txLogoBox, { backgroundColor: '#18181B', borderWidth: 1, borderColor: '#27272A' }]}>
+                        <Feather name={isLent ? 'arrow-up-right' : 'arrow-down-left'} size={16} color={isLent ? '#10B981' : '#EF4444'} />
                       </View>
 
-                      <View style={styles.loanNetWorthRow}>
-                        <Text style={styles.loanNetWorthLabel}>
-                          {isExcluded ? 'Excluded from Total Net Worth' : 'Included in Total Net Worth'}
+                      <View style={{ flex: 1, marginHorizontal: 12 }}>
+                        <Text style={styles.txCategory}>{loanAcc.name}</Text>
+                        <Text style={styles.txDate}>
+                          {isLent ? 'Money Lent' : 'Loan'} • {loanAcc.note || new Date(loanAcc.created_at).toLocaleDateString()}
                         </Text>
-                        <TouchableOpacity
-                          style={[styles.netWorthPillBtn, isExcluded ? styles.netWorthPillOff : styles.netWorthPillOn]}
-                          onPress={() => toggleLoanNetWorth(loanAcc)}
-                        >
-                          <Text style={[styles.netWorthPillText, isExcluded ? styles.netWorthPillTextOff : styles.netWorthPillTextOn]}>
-                            {isExcluded ? 'Include ➕' : 'Exclude ➖'}
-                          </Text>
-                        </TouchableOpacity>
                       </View>
-                    </View>
+
+                      <Text style={[styles.txAmount, isLent ? styles.incomeText : styles.expenseText]}>
+                        {isLent ? '+ ' : '- '}₱{Number(loanAcc.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </Text>
+                    </TouchableOpacity>
                   );
                 })
               )}
@@ -1458,16 +1463,16 @@ export default function App() {
       {/* --- Bottom Navigation Bar --- */}
       <View style={styles.bottomNavBar}>
         <TouchableOpacity style={styles.navTab} onPress={() => setActiveTab('home')}>
-          <Text style={[styles.navIcon, activeTab === 'home' && styles.activeNavIcon]}>🏠</Text>
+          <Feather name="home" size={20} color={activeTab === 'home' ? '#FAFAFA' : '#71717A'} />
           <Text style={[styles.navLabel, activeTab === 'home' && styles.activeNavLabel]}>Home</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.centerFab} onPress={() => setTxModalVisible(true)}>
-          <Text style={styles.centerFabPlus}>+</Text>
+          <Feather name="plus" size={20} color="#09090B" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.navTab} onPress={() => setActiveTab('insights')}>
-          <Text style={[styles.navIcon, activeTab === 'insights' && styles.activeNavIcon]}>📊</Text>
+          <Feather name="pie-chart" size={20} color={activeTab === 'insights' ? '#FAFAFA' : '#71717A'} />
           <Text style={[styles.navLabel, activeTab === 'insights' && styles.activeNavLabel]}>Overview</Text>
         </TouchableOpacity>
       </View>
@@ -2264,216 +2269,216 @@ export default function App() {
 // --- Styles ---
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b1120', paddingHorizontal: 16 },
+  container: { flex: 1, backgroundColor: '#09090B', paddingHorizontal: 16 },
   authScroll: { paddingVertical: 40, paddingHorizontal: 8, justifyContent: 'center' },
-  title: { fontSize: 36, fontWeight: '900', color: '#38bdf8', textAlign: 'center', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#94a3b8', textAlign: 'center', marginBottom: 28 },
-  inputLabel: { fontSize: 12, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  subInputLabel: { fontSize: 11, color: '#64748b', marginBottom: 6, marginTop: 4 },
-  input: { backgroundColor: '#1e293b', color: '#f8fafc', padding: 14, borderRadius: 10, fontSize: 16, marginBottom: 16 },
+  title: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 36, color: '#FAFAFA', textAlign: 'center', marginBottom: 6 },
+  subtitle: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 14, color: '#A1A1AA', textAlign: 'center', marginBottom: 28 },
+  inputLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: '#71717A', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1.2 },
+  subInputLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, color: '#71717A', marginBottom: 6, marginTop: 4 },
+  input: { fontFamily: 'PlusJakartaSans_400Regular', backgroundColor: '#18181B', borderWidth: 1, borderColor: '#27272A', color: '#FAFAFA', padding: 14, borderRadius: 10, fontSize: 16, marginBottom: 16 },
 
-  welcomeCard: { backgroundColor: '#1e293b', borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#334155' },
-  welcomeCardHeader: { fontSize: 20, fontWeight: '800', color: '#f8fafc', marginBottom: 8, textAlign: 'center' },
-  welcomeCardDesc: { fontSize: 13, color: '#94a3b8', textAlign: 'center', marginBottom: 24, lineHeight: 20 },
+  welcomeCard: { backgroundColor: '#111113', borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#1E1E22' },
+  welcomeCardHeader: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, color: '#FAFAFA', marginBottom: 8, textAlign: 'center' },
+  welcomeCardDesc: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: '#A1A1AA', textAlign: 'center', marginBottom: 24, lineHeight: 20 },
 
-  guestButton: { backgroundColor: '#38bdf8', padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  guestBtnText: { color: '#0f172a', fontWeight: '800', fontSize: 15 },
+  guestButton: { backgroundColor: '#FAFAFA', padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  guestBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B', fontSize: 15 },
 
   // Empty Card Box
-  emptyCardBox: { backgroundColor: '#1e293b', borderRadius: 16, padding: 24, alignItems: 'center', marginVertical: 12, borderWidth: 1.5, borderColor: '#334155', borderStyle: 'dashed' },
-  emptyCardTitle: { fontSize: 16, fontWeight: '700', color: '#f8fafc', marginBottom: 6 },
-  emptyCardDesc: { fontSize: 13, color: '#94a3b8', textAlign: 'center', marginBottom: 16 },
-  emptyCardActionBtn: { backgroundColor: '#38bdf8', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10 },
-  emptyCardActionBtnText: { color: '#0f172a', fontWeight: '800', fontSize: 14 },
+  emptyCardBox: { backgroundColor: '#111113', borderRadius: 16, padding: 24, alignItems: 'center', marginVertical: 12, borderWidth: 1, borderColor: '#27272A', borderStyle: 'dashed' },
+  emptyCardTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: '#FAFAFA', marginBottom: 6 },
+  emptyCardDesc: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: '#A1A1AA', textAlign: 'center', marginBottom: 16 },
+  emptyCardActionBtn: { backgroundColor: '#FAFAFA', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10 },
+  emptyCardActionBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B', fontSize: 14 },
 
   // Top Bar Header
-  topBarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
-  userProfilePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 },
-  userProfileText: { color: '#f8fafc', fontWeight: '700', fontSize: 14 },
-  guestBadge: { backgroundColor: '#f59e0b22', color: '#f59e0b', fontSize: 10, fontWeight: '800', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 10, marginLeft: 6 },
-  userProfileArrow: { color: '#94a3b8', fontWeight: '700', marginLeft: 6 },
-  headerAddBtn: { backgroundColor: '#38bdf8', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16 },
-  headerAddBtnText: { color: '#0f172a', fontWeight: '700', fontSize: 13 },
+  topBarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+  userProfilePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111113', borderWidth: 1, borderColor: '#1E1E22', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 },
+  userProfileText: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#FAFAFA', fontSize: 14 },
+  guestBadge: { fontFamily: 'PlusJakartaSans_700Bold', backgroundColor: '#18181B', color: '#A1A1AA', fontSize: 10, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 10, marginLeft: 6 },
+  userProfileArrow: { fontFamily: 'PlusJakartaSans_700Bold', color: '#71717A', marginLeft: 6 },
+  headerAddBtn: { backgroundColor: '#FAFAFA', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16 },
+  headerAddBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#09090B', fontSize: 13 },
 
   // Cards
-  netWorthCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 18, marginBottom: 16 },
+  netWorthCard: { backgroundColor: '#111113', borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: '#1E1E22' },
   netWorthHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  netWorthLabel: { fontSize: 13, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8 },
-  eyeIcon: { fontSize: 18, color: '#94a3b8' },
-  netWorthAmount: { fontSize: 30, fontWeight: '800', color: '#f8fafc', marginTop: 8 },
+  netWorthLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: '#71717A', textTransform: 'uppercase', letterSpacing: 1.4 },
+  eyeIcon: { fontSize: 16, color: '#71717A' },
+  netWorthAmount: { fontFamily: 'JetBrainsMono_600SemiBold', fontSize: 40, color: '#FAFAFA', marginTop: 8, fontVariant: ['tabular-nums'] },
 
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 10 },
   accountsGridHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionHeading: { fontSize: 16, fontWeight: '700', color: '#e2e8f0' },
-  seeAllText: { fontSize: 13, fontWeight: '600', color: '#38bdf8' },
-  pageTitle: { fontSize: 22, fontWeight: '800', color: '#f8fafc' },
+  sectionHeading: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: '#FAFAFA' },
+  seeAllText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: '#A1A1AA' },
+  pageTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, color: '#FAFAFA' },
 
-  topFourBadge: { backgroundColor: '#38bdf8', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 },
-  topFourBadgeText: { color: '#0f172a', fontSize: 9, fontWeight: '800' },
+  topFourBadge: { backgroundColor: '#18181B', borderWidth: 1, borderColor: '#27272A', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 },
+  topFourBadgeText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#A1A1AA', fontSize: 9 },
 
   // Accounts Grid
   accountsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  accountGridCard: { width: '48%', backgroundColor: '#1e293b', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1.5, borderColor: 'transparent' },
-  accountGridCardSelected: { borderColor: '#38bdf8', backgroundColor: '#0f172a' },
+  accountGridCard: { width: '48%', backgroundColor: '#111113', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#1E1E22' },
+  accountGridCardSelected: { borderColor: '#FAFAFA', backgroundColor: '#18181B' },
   accountLogoBox: { width: 38, height: 38, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  accountLogoText: { fontSize: 11, fontWeight: '800' },
-  accountCardName: { fontSize: 15, fontWeight: '700', color: '#f8fafc', marginBottom: 4 },
-  accountCardBalance: { fontSize: 16, fontWeight: '800', color: '#f8fafc' },
-  accountCardType: { fontSize: 12, color: '#64748b', marginTop: 2 },
-  interestTag: { marginTop: 8, backgroundColor: '#0f172a', paddingVertical: 3, paddingHorizontal: 6, borderRadius: 6 },
-  interestTagText: { fontSize: 10, fontWeight: '700', color: '#34d399' },
+  accountLogoText: { fontFamily: 'JetBrainsMono_700Bold', fontSize: 11 },
+  accountCardName: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: '#FAFAFA', marginBottom: 4 },
+  accountCardBalance: { fontFamily: 'JetBrainsMono_700Bold', fontSize: 16, color: '#FAFAFA', fontVariant: ['tabular-nums'] },
+  accountCardType: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, color: '#71717A', marginTop: 2 },
+  interestTag: { marginTop: 8, backgroundColor: '#18181B', paddingVertical: 3, paddingHorizontal: 6, borderRadius: 6, borderWidth: 1, borderColor: '#27272A' },
+  interestTagText: { fontFamily: 'JetBrainsMono_600SemiBold', fontSize: 10, color: '#10B981', fontVariant: ['tabular-nums'] },
   assetActionRow: { marginTop: 8 },
-  assetAddBtn: { backgroundColor: '#38bdf8', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, alignItems: 'center' },
-  assetAddBtnText: { color: '#0f172a', fontSize: 11, fontWeight: '700' },
-  addAccountDashedCard: { width: '48%', backgroundColor: '#0f172a', borderWidth: 1.5, borderColor: '#334155', borderStyle: 'dashed', borderRadius: 14, padding: 14, justifyContent: 'center', alignItems: 'center', height: 120, marginBottom: 12 },
-  addAccountPlusIcon: { fontSize: 24, color: '#f8fafc', fontWeight: '600' },
-  addAccountText: { fontSize: 13, fontWeight: '700', color: '#f8fafc', marginTop: 4 },
+  assetAddBtn: { backgroundColor: '#FAFAFA', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, alignItems: 'center' },
+  assetAddBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B', fontSize: 11 },
+  addAccountDashedCard: { width: '48%', backgroundColor: '#111113', borderWidth: 1, borderColor: '#27272A', borderStyle: 'dashed', borderRadius: 14, padding: 14, justifyContent: 'center', alignItems: 'center', height: 120, marginBottom: 12 },
+  addAccountPlusIcon: { fontSize: 24, color: '#FAFAFA', fontWeight: '600' },
+  addAccountText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: '#FAFAFA', marginTop: 4 },
   accountCardActionRow: { flexDirection: 'row', marginTop: 8, gap: 6 },
-  accountAddTxBtn: { backgroundColor: '#38bdf8', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, flex: 1, alignItems: 'center' },
-  accountAddTxBtnText: { color: '#0f172a', fontSize: 11, fontWeight: '700' },
+  accountAddTxBtn: { backgroundColor: '#FAFAFA', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, flex: 1, alignItems: 'center' },
+  accountAddTxBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B', fontSize: 11 },
 
   // Date / Time Cards
   dateTimeRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  dateTimeCard: { flex: 1, backgroundColor: '#0f172a', padding: 12, borderRadius: 10, marginRight: 6, borderWidth: 1, borderColor: '#334155' },
-  dateTimeLabel: { fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 },
-  dateTimeValue: { fontSize: 13, fontWeight: '700', color: '#f8fafc' },
+  dateTimeCard: { flex: 1, backgroundColor: '#18181B', padding: 12, borderRadius: 10, marginRight: 6, borderWidth: 1, borderColor: '#27272A' },
+  dateTimeLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: '#71717A', textTransform: 'uppercase', marginBottom: 4 },
+  dateTimeValue: { fontFamily: 'JetBrainsMono_600SemiBold', fontSize: 13, color: '#FAFAFA', fontVariant: ['tabular-nums'] },
 
   // Custom Bottom Sheet Keypad Styles
-  calcOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  calcSheetContainer: { backgroundColor: '#f1f5f9', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 24 },
-  calcDragIndicator: { width: 36, height: 5, backgroundColor: '#cbd5e1', borderRadius: 3, alignSelf: 'center', marginBottom: 12 },
-  calcDisplayBox: { backgroundColor: '#ffffff', borderRadius: 12, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#e2e8f0' },
-  calcDisplayLabel: { fontSize: 11, color: '#64748b', textTransform: 'uppercase' },
-  calcDisplayText: { fontSize: 28, fontWeight: '800', color: '#0f172a', marginTop: 2 },
+  calcOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  calcSheetContainer: { backgroundColor: '#18181B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 24, borderWidth: 1, borderColor: '#27272A' },
+  calcDragIndicator: { width: 36, height: 4, backgroundColor: '#27272A', borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
+  calcDisplayBox: { backgroundColor: '#111113', borderRadius: 12, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#1E1E22' },
+  calcDisplayLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: '#71717A', textTransform: 'uppercase' },
+  calcDisplayText: { fontFamily: 'JetBrainsMono_700Bold', fontSize: 28, color: '#FAFAFA', marginTop: 2, fontVariant: ['tabular-nums'] },
   keypadGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  keyBtnLight: { width: '23%', backgroundColor: '#e2e8f0', borderRadius: 12, height: 52, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  keyBtnDark: { width: '23%', backgroundColor: '#334155', borderRadius: 12, height: 52, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  keyBtnGreen: { width: '23%', backgroundColor: '#10b981', borderRadius: 12, height: 52, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  keyTextDark: { fontSize: 20, fontWeight: '700', color: '#0f172a' },
-  keyTextWhite: { fontSize: 20, fontWeight: '700', color: '#ffffff' },
+  keyBtnLight: { width: '23%', backgroundColor: '#18181B', borderRadius: 12, height: 52, justifyContent: 'center', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#27272A' },
+  keyBtnDark: { width: '23%', backgroundColor: '#27272A', borderRadius: 12, height: 52, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  keyBtnGreen: { width: '23%', backgroundColor: '#FAFAFA', borderRadius: 12, height: 52, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  keyTextDark: { fontFamily: 'JetBrainsMono_600SemiBold', fontSize: 20, color: '#FAFAFA', fontVariant: ['tabular-nums'] },
+  keyTextWhite: { fontFamily: 'JetBrainsMono_700Bold', fontSize: 20, color: '#09090B', fontVariant: ['tabular-nums'] },
 
   // Logo Picker
-  logoPickerBox: { backgroundColor: '#0f172a', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#334155' },
-  pickPhotoBtn: { backgroundColor: '#334155', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, flex: 1, alignItems: 'center' },
-  pickPhotoBtnText: { color: '#f8fafc', fontSize: 12, fontWeight: '600' },
+  logoPickerBox: { backgroundColor: '#18181B', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#27272A' },
+  pickPhotoBtn: { backgroundColor: '#111113', borderWidth: 1, borderColor: '#1E1E22', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, flex: 1, alignItems: 'center' },
+  pickPhotoBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#FAFAFA', fontSize: 12 },
   brandChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginRight: 6, marginBottom: 6 },
-  brandChipText: { fontSize: 11, fontWeight: '800' },
-  emojiChip: { backgroundColor: '#1e293b', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginRight: 6, marginBottom: 6 },
-  chipActiveBorder: { borderWidth: 2, borderColor: '#38bdf8' },
+  brandChipText: { fontFamily: 'JetBrainsMono_700Bold', fontSize: 11 },
+  emojiChip: { backgroundColor: '#18181B', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginRight: 6, marginBottom: 6, borderWidth: 1, borderColor: '#27272A' },
+  chipActiveBorder: { borderWidth: 2, borderColor: '#FAFAFA' },
   colorCircle: { width: 28, height: 28, borderRadius: 14, marginRight: 8, marginBottom: 6 },
-  colorCircleActive: { borderWidth: 3, borderColor: '#f8fafc' },
+  colorCircleActive: { borderWidth: 3, borderColor: '#FAFAFA' },
 
   // Daily Limit
-  dailyLimitCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, marginVertical: 12 },
+  dailyLimitCard: { backgroundColor: '#111113', borderRadius: 16, padding: 16, marginVertical: 12, borderWidth: 1, borderColor: '#1E1E22' },
   dailyLimitHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  dailyLimitTitle: { fontSize: 15, fontWeight: '700', color: '#f8fafc' },
-  dailyLimitAmount: { fontSize: 13, color: '#94a3b8' },
-  editLimitBtn: { backgroundColor: '#0f172a', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: '#334155' },
-  editLimitBtnText: { fontSize: 12, fontWeight: '600', color: '#38bdf8' },
-  progressBarTrack: { height: 8, backgroundColor: '#0f172a', borderRadius: 4, overflow: 'hidden', marginVertical: 8 },
-  progressBarFill: { height: '100%', backgroundColor: '#10b981', borderRadius: 4 },
+  dailyLimitTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: '#FAFAFA' },
+  dailyLimitAmount: { fontFamily: 'JetBrainsMono_600SemiBold', fontSize: 13, color: '#A1A1AA', fontVariant: ['tabular-nums'] },
+  editLimitBtn: { backgroundColor: '#18181B', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: '#27272A' },
+  editLimitBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#FAFAFA' },
+  progressBarTrack: { height: 8, backgroundColor: '#18181B', borderRadius: 4, overflow: 'hidden', marginVertical: 8, borderWidth: 1, borderColor: '#27272A' },
+  progressBarFill: { height: '100%', backgroundColor: '#10B981', borderRadius: 4 },
   dailyLimitFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  dailyLimitSpent: { fontSize: 12, color: '#94a3b8' },
-  dailyLimitRemaining: { fontSize: 12, color: '#38bdf8', fontWeight: '600' },
+  dailyLimitSpent: { fontFamily: 'JetBrainsMono_500Medium', fontSize: 12, color: '#71717A', fontVariant: ['tabular-nums'] },
+  dailyLimitRemaining: { fontFamily: 'JetBrainsMono_600SemiBold', fontSize: 12, color: '#A1A1AA', fontVariant: ['tabular-nums'] },
 
   // Transactions
-  transactionCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  transactionCard: { paddingVertical: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1C1C20' },
   txLogoBox: { width: 34, height: 34, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  txCategory: { fontSize: 14, fontWeight: '600', color: '#f8fafc' },
-  txDate: { fontSize: 12, color: '#64748b', marginTop: 2 },
-  txAmount: { fontSize: 15, fontWeight: '700' },
-  expenseText: { color: '#f87171' },
-  incomeText: { color: '#34d399' },
-  emptyText: { color: '#64748b', fontSize: 13, fontStyle: 'italic', marginVertical: 8 },
+  txCategory: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: '#FAFAFA' },
+  txDate: { fontFamily: 'JetBrainsMono_500Medium', fontSize: 12, color: '#71717A', fontVariant: ['tabular-nums'] },
+  txAmount: { fontFamily: 'JetBrainsMono_700Bold', fontSize: 15, fontVariant: ['tabular-nums'] },
+  expenseText: { color: '#EF4444' },
+  incomeText: { color: '#10B981' },
+  emptyText: { fontFamily: 'PlusJakartaSans_400Regular', color: '#71717A', fontSize: 13, fontStyle: 'italic', marginVertical: 8 },
 
   // Money Lent & Loans
-  lentLoanSection: { marginTop: 18, backgroundColor: '#0f172a', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#334155' },
-  addLoanAccountBtn: { backgroundColor: '#1e293b', paddingVertical: 10, borderRadius: 10, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#38bdf8' },
-  addLoanAccountBtnText: { color: '#38bdf8', fontWeight: '700', fontSize: 13 },
-  settledBtn: { backgroundColor: '#334155', paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6, marginTop: 4 },
-  settledBtnText: { color: '#f8fafc', fontSize: 10, fontWeight: '700' },
-  loanCardContainer: { backgroundColor: '#1e293b', borderRadius: 12, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#334155' },
-  loanNoteText: { fontSize: 11, color: '#94a3b8', fontStyle: 'italic', marginTop: 2 },
-  loanEntryBtn: { backgroundColor: '#38bdf8', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
-  loanEntryBtnText: { color: '#0f172a', fontSize: 11, fontWeight: '700' },
-  loanEditBtn: { backgroundColor: '#334155', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
-  loanEditBtnText: { fontSize: 11 },
-  loanNetWorthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0f172a', paddingHorizontal: 12, paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#1e293b' },
-  loanNetWorthLabel: { fontSize: 11, color: '#94a3b8' },
+  lentLoanSection: { marginTop: 18, backgroundColor: '#111113', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1E1E22' },
+  addLoanAccountBtn: { backgroundColor: '#18181B', paddingVertical: 10, borderRadius: 10, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#27272A' },
+  addLoanAccountBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#FAFAFA', fontSize: 13 },
+  settledBtn: { backgroundColor: '#18181B', paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6, marginTop: 4, borderWidth: 1, borderColor: '#27272A' },
+  settledBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#FAFAFA', fontSize: 10 },
+  loanCardContainer: { backgroundColor: '#18181B', borderRadius: 12, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#27272A' },
+  loanNoteText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, color: '#71717A', fontStyle: 'italic', marginTop: 2 },
+  loanEntryBtn: { backgroundColor: '#FAFAFA', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
+  loanEntryBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B', fontSize: 11 },
+  loanEditBtn: { backgroundColor: '#18181B', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: '#27272A' },
+  loanEditBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: '#FAFAFA' },
+  loanNetWorthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111113', paddingHorizontal: 12, paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#1E1E22' },
+  loanNetWorthLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, color: '#71717A' },
   netWorthPillBtn: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 12 },
-  netWorthPillOn: { backgroundColor: '#10b98122', borderWidth: 1, borderColor: '#10b981' },
-  netWorthPillOff: { backgroundColor: '#ef444422', borderWidth: 1, borderColor: '#ef4444' },
-  netWorthPillText: { fontSize: 10, fontWeight: '700' },
-  netWorthPillTextOn: { color: '#34d399' },
-  netWorthPillTextOff: { color: '#f87171' },
-  catAddEntryBtn: { backgroundColor: '#38bdf822', paddingVertical: 2, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: '#38bdf8' },
-  catAddEntryBtnText: { color: '#38bdf8', fontSize: 11, fontWeight: '700' },
+  netWorthPillOn: { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderWidth: 1, borderColor: '#10B981' },
+  netWorthPillOff: { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: '#EF4444' },
+  netWorthPillText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10 },
+  netWorthPillTextOn: { color: '#10B981' },
+  netWorthPillTextOff: { color: '#EF4444' },
+  catAddEntryBtn: { backgroundColor: '#18181B', paddingVertical: 2, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: '#27272A' },
+  catAddEntryBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#FAFAFA', fontSize: 11 },
 
   // Account Filters
-  filterChip: { backgroundColor: '#1e293b', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
-  activeFilterChip: { backgroundColor: '#f8fafc' },
-  filterChipText: { color: '#94a3b8', fontWeight: '600', fontSize: 13 },
-  activeFilterChipText: { color: '#0f172a', fontWeight: '700' },
+  filterChip: { backgroundColor: '#111113', borderWidth: 1, borderColor: '#1E1E22', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
+  activeFilterChip: { backgroundColor: '#FAFAFA', borderColor: '#FAFAFA' },
+  filterChipText: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#71717A', fontSize: 13 },
+  activeFilterChipText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B' },
 
   // Overview
-  periodTabContainer: { flexDirection: 'row', backgroundColor: '#1e293b', borderRadius: 10, padding: 4, marginBottom: 10 },
+  periodTabContainer: { flexDirection: 'row', backgroundColor: '#111113', borderRadius: 10, padding: 4, marginBottom: 10, borderWidth: 1, borderColor: '#1E1E22' },
   periodTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-  activePeriodTab: { backgroundColor: '#38bdf8' },
-  periodTabText: { color: '#94a3b8', fontWeight: '600', fontSize: 12 },
-  activePeriodTabText: { color: '#0f172a', fontWeight: '700' },
+  activePeriodTab: { backgroundColor: '#FAFAFA' },
+  periodTabText: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#71717A', fontSize: 12 },
+  activePeriodTabText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B' },
 
-  typeTabContainer: { flexDirection: 'row', backgroundColor: '#0f172a', borderRadius: 10, padding: 4, marginBottom: 16 },
+  typeTabContainer: { flexDirection: 'row', backgroundColor: '#111113', borderRadius: 10, padding: 4, marginBottom: 16, borderWidth: 1, borderColor: '#1E1E22' },
   typeTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-  activeTypeTab: { backgroundColor: '#334155' },
-  typeTabText: { color: '#64748b', fontWeight: '600', fontSize: 12 },
-  activeTypeTabText: { color: '#f8fafc', fontWeight: '700' },
+  activeTypeTab: { backgroundColor: '#FAFAFA' },
+  typeTabText: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#71717A', fontSize: 12 },
+  activeTypeTabText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B' },
 
   kpiRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  kpiCard: { flex: 1, backgroundColor: '#1e293b', borderRadius: 12, padding: 14, marginRight: 8, borderLeftWidth: 4 },
-  kpiLabel: { fontSize: 12, color: '#94a3b8', textTransform: 'uppercase' },
-  kpiIncomeValue: { fontSize: 16, fontWeight: '700', color: '#34d399', marginTop: 4 },
-  kpiExpenseValue: { fontSize: 16, fontWeight: '700', color: '#f87171', marginTop: 4 },
+  kpiCard: { flex: 1, backgroundColor: '#111113', borderRadius: 12, padding: 14, marginRight: 8, borderWidth: 1, borderColor: '#1E1E22', borderLeftWidth: 4 },
+  kpiLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: '#71717A', textTransform: 'uppercase', letterSpacing: 1.2 },
+  kpiIncomeValue: { fontFamily: 'JetBrainsMono_700Bold', fontSize: 16, color: '#10B981', marginTop: 4, fontVariant: ['tabular-nums'] },
+  kpiExpenseValue: { fontFamily: 'JetBrainsMono_700Bold', fontSize: 16, color: '#EF4444', marginTop: 4, fontVariant: ['tabular-nums'] },
 
-  breakdownCard: { backgroundColor: '#1e293b', borderRadius: 14, padding: 16, marginBottom: 16 },
+  breakdownCard: { backgroundColor: '#111113', borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#1E1E22' },
   categoryRowHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  categoryName: { fontSize: 13, color: '#f8fafc', fontWeight: '600' },
-  categoryValue: { fontSize: 13, color: '#f8fafc', fontWeight: '700' },
-  categoryBarTrack: { height: 6, backgroundColor: '#0f172a', borderRadius: 3, overflow: 'hidden' },
-  categoryBarFill: { height: '100%', backgroundColor: '#38bdf8', borderRadius: 3 },
+  categoryName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: '#FAFAFA' },
+  categoryValue: { fontFamily: 'JetBrainsMono_700Bold', fontSize: 13, color: '#FAFAFA', fontVariant: ['tabular-nums'] },
+  categoryBarTrack: { height: 6, backgroundColor: '#18181B', borderRadius: 3, overflow: 'hidden', borderWidth: 1, borderColor: '#27272A' },
+  categoryBarFill: { height: '100%', backgroundColor: '#FAFAFA', borderRadius: 3 },
 
   // Bottom Nav
-  bottomNavBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 70, backgroundColor: '#1e293b', borderTopWidth: 1, borderTopColor: '#334155', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 20 },
+  bottomNavBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 64, backgroundColor: '#09090B', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#1C1C20', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 20 },
   navTab: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   navIcon: { fontSize: 20, opacity: 0.5 },
   activeNavIcon: { opacity: 1 },
-  navLabel: { fontSize: 11, color: '#64748b', marginTop: 2, fontWeight: '600' },
-  activeNavLabel: { color: '#38bdf8', fontWeight: '700' },
-  centerFab: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#38bdf8', justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 6 },
-  centerFabPlus: { fontSize: 28, color: '#0f172a', fontWeight: '700', marginTop: -2 },
+  navLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: '#71717A', marginTop: 2 },
+  activeNavLabel: { fontFamily: 'PlusJakartaSans_700Bold', color: '#FAFAFA' },
+  centerFab: { width: 48, height: 36, borderRadius: 11, backgroundColor: '#FAFAFA', justifyContent: 'center', alignItems: 'center' },
+  centerFabPlus: { fontSize: 28, color: '#09090B', fontWeight: '700', marginTop: -2 },
 
   // Modals
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
-  modalContent: { backgroundColor: '#1e293b', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  profileModalContent: { backgroundColor: '#1e293b', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24 },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#f8fafc', marginBottom: 16 },
-  toggleRow: { flexDirection: 'row', backgroundColor: '#0f172a', borderRadius: 10, padding: 4, marginBottom: 16 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.75)' },
+  modalContent: { backgroundColor: '#18181B', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%', borderWidth: 1, borderColor: '#27272A' },
+  profileModalContent: { backgroundColor: '#18181B', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, borderWidth: 1, borderColor: '#27272A' },
+  modalTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, color: '#FAFAFA', marginBottom: 16 },
+  toggleRow: { flexDirection: 'row', backgroundColor: '#18181B', borderRadius: 10, padding: 4, marginBottom: 16, borderWidth: 1, borderColor: '#27272A' },
   toggleBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-  toggleExpenseActive: { backgroundColor: '#ef4444' },
-  toggleIncomeActive: { backgroundColor: '#10b981' },
-  toggleText: { color: '#94a3b8', fontWeight: '600' },
-  toggleTextActive: { color: '#fff' },
-  modalInput: { backgroundColor: '#0f172a', color: '#fff', padding: 12, borderRadius: 8, fontSize: 15, marginBottom: 12 },
+  toggleExpenseActive: { backgroundColor: '#EF4444' },
+  toggleIncomeActive: { backgroundColor: '#10B981' },
+  toggleText: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#71717A' },
+  toggleTextActive: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B' },
+  modalInput: { fontFamily: 'PlusJakartaSans_400Regular', backgroundColor: '#18181B', borderWidth: 1, borderColor: '#27272A', color: '#FAFAFA', padding: 12, borderRadius: 8, fontSize: 15, marginBottom: 12 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 },
-  chip: { backgroundColor: '#0f172a', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginRight: 8, marginBottom: 8 },
-  chipActive: { backgroundColor: '#38bdf8' },
-  chipText: { color: '#94a3b8', fontSize: 13 },
-  chipTextActive: { color: '#0f172a', fontWeight: '700' },
-  interestSectionBox: { backgroundColor: '#0f172a', borderRadius: 12, padding: 14, marginVertical: 12, borderWidth: 1, borderColor: '#334155' },
+  chip: { backgroundColor: '#18181B', borderWidth: 1, borderColor: '#27272A', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginRight: 8, marginBottom: 8 },
+  chipActive: { backgroundColor: '#FAFAFA', borderColor: '#FAFAFA' },
+  chipText: { fontFamily: 'PlusJakartaSans_500Medium', color: '#A1A1AA', fontSize: 13 },
+  chipTextActive: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B' },
+  interestSectionBox: { backgroundColor: '#18181B', borderRadius: 12, padding: 14, marginVertical: 12, borderWidth: 1, borderColor: '#27272A' },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 },
-  switchLabel: { fontSize: 13, fontWeight: '700', color: '#f8fafc' },
+  switchLabel: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: '#FAFAFA' },
   modalActions: { flexDirection: 'row', marginTop: 10, marginBottom: 10 },
-  cancelBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center', backgroundColor: '#334155', marginRight: 8 },
-  cancelBtnText: { color: '#e2e8f0', fontWeight: '600' },
-  saveBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center', backgroundColor: '#38bdf8' },
-  saveBtnText: { color: '#0f172a', fontWeight: '700' },
+  cancelBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center', backgroundColor: '#18181B', borderWidth: 1, borderColor: '#27272A', marginRight: 8 },
+  cancelBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#A1A1AA' },
+  saveBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center', backgroundColor: '#FAFAFA' },
+  saveBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#09090B' },
 });

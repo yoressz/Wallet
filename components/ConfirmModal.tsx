@@ -33,7 +33,7 @@ export function ConfirmModal({ modal, onClose }: ConfirmModalProps) {
                   <Feather
                     name={isDestructive ? 'trash-2' : 'help-circle'}
                     size={22}
-                    color={isDestructive ? '#EF4444' : '#38BDF8'}
+                    color={isDestructive ? '#EF4444' : '#FAFAFA'}
                   />
                 </View>
               </View>
@@ -76,11 +76,11 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    backgroundColor: '#111827',
+    backgroundColor: '#18181B',
     borderRadius: 20,
     padding: 22,
     borderWidth: 1,
-    borderColor: '#1F2937',
+    borderColor: '#27272A',
   },
   iconHeaderRow: {
     alignItems: 'center',
@@ -97,18 +97,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.12)',
   },
   infoIconCircle: {
-    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    backgroundColor: 'rgba(250, 250, 250, 0.12)',
   },
   title: {
+    fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 18,
-    fontWeight: '800',
-    color: '#F8FAFC',
+    color: '#FAFAFA',
     textAlign: 'center',
     marginBottom: 8,
   },
   message: {
+    fontFamily: 'PlusJakartaSans_400Regular',
     fontSize: 13,
-    color: '#94A3B8',
+    color: '#A1A1AA',
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 20,
@@ -121,14 +122,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#27272A',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#3F3F46',
   },
   cancelBtnText: {
-    color: '#CBD5E1',
-    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#E4E4E7',
     fontSize: 14,
   },
   confirmBtn: {
@@ -141,16 +142,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
   },
   primaryBtn: {
-    backgroundColor: '#38BDF8',
+    backgroundColor: '#FAFAFA',
   },
   confirmBtnText: {
-    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 14,
   },
   destructiveBtnText: {
     color: '#FFFFFF',
   },
   primaryBtnText: {
-    color: '#0F172A',
+    color: '#09090B',
   },
 });
